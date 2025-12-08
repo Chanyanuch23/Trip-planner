@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เลือกวันว่างเที่ยวกันเถอะ</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; padding: 20px; text-align: center; }
+        .btn { background-color: #06C755; color: white; border: none; padding: 15px 30px; border-radius: 5px; font-size: 18px; cursor: pointer; margin-top: 20px; width: 100%; }
+        h2 { color: #333; }
+    </style>
+</head>
+<body>
+
+    <h2>📅 เลือกวันที่คุณว่าง</h2>
+    <p>จิ้มเลือกวันที่ว่างได้หลายวันเลย!</p>
+    
+    <input type="text" id="calendar" placeholder="แตะเพื่อเลือกวัน..." style="display:none;">
+    
+    <button class="btn" id="submitBtn">ยืนยันวันว่าง</button>
+
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <script>
+        // --- 1. ตั้งค่าตัวแปร ---
+        // ใส่ LIFF ID ที่ได้จาก LINE Developers (เดี๋ยวเราไปเอากันในขั้นตอนที่ 3)
+        const MY_LIFF_ID = "2008649534-6mDQ8Amx"; 
+        
+        // ใส่ Webhook URL ของ n8n (เดี๋ยวเราไปเอากันในขั้นตอนที่ 4)
+        const N8N_WEBHOOK_URL = "https://may12345.app.n8n.cloud/webhook/trip-planner"; 
+
+        let selectedDates = [];
+        let userProfile = {};
+        let context = {};
+
+        // --- 2. เริ่มต้นการทำงานของปฏิทิน ---
+        const fp = flatpickr("#calendar", {
+            mode: "multiple", // เลือกได้หลายวัน
+            dateFormat: "Y-m-d",
+            inline: true, // โชว์ปฏิทินค้างไว้เลย ไม่ต้องกด Pop-up
+            onChange: function(selectedDatesStr, dateStr) {
+                selectedDates = dateStr.split(', '); // เก็บวันที่ user เลือก
+            }
+        });
+
+        // --- 3. เริ่มต้น LIFF ---
+        async function main() {
+            await liff.init({ liffId: MY_LIFF_ID });
+            
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+
+            // ดึงข้อมูล User และ Context (Group ID)
+            userProfile = await liff.getProfile();
+            context = liff.getContext(); // เพื่อให้รู้ว่ากดมาจากกลุ่มไหน
+        }
+        main();
+
+        // --- 4. เมื่อกดปุ่มส่งข้อมูล ---
+        document.getElementById('submitBtn').addEventListener('click', () => {
+            if (selectedDates.length === 0 || selectedDates[0] === "") {
+                alert("กรุณาเลือกวันอย่างน้อย 1 วันครับ");
+                return;
+            }
+
+            // ส่งข้อมูลไปหา n8n
+            fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: userProfile.userId,
+                    displayName: userProfile.displayName,
+                    groupId: context.groupId || "Individual", // ถ้าไม่ได้เข้าผ่านกลุ่ม จะเป็น Individual
+                    dates: selectedDates
+                })
+            })
+            .then(response => {
+                if(response.ok) {
+                    liff.closeWindow(); // ปิดหน้าต่าง LIFF ทันทีเมื่อเสร็จ
+                } else {
+                    alert("ส่งข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง");
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
