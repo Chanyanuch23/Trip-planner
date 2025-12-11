@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เลือกวันว่างเที่ยวกัน 📅</title>
+    
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- 🎨 2. ตกแต่งธีมสีน้ำเงิน --- */
+        :root {
+            --primary-blue: #0066FF;       /* สีน้ำเงินหลัก */
+            --dark-blue: #0044AA;          /* สีน้ำเงินเข้ม (ตอนกด) */
+            --light-blue: #E6F0FF;         /* สีพื้นหลังอ่อนๆ */
+            --text-color: #333333;
+            --white: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: var(--light-blue);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--white);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 102, 255, 0.1);
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--primary-blue);
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        /* ปรับแต่งปฏิทิน Flatpickr ให้เป็นสีน้ำเงิน */
+        .flatpickr-calendar {
+            box-shadow: none !important;
+            margin: 0 auto;
+        }
+        .flatpickr-day.selected, 
+        .flatpickr-day.startRange, 
+        .flatpickr-day.endRange, 
+        .flatpickr-day.selected.inRange, 
+        .flatpickr-day.startRange.inRange, 
+        .flatpickr-day.endRange.inRange, 
+        .flatpickr-day.selected:focus, 
+        .flatpickr-day.startRange:focus, 
+        .flatpickr-day.endRange:focus, 
+        .flatpickr-day.selected:hover, 
+        .flatpickr-day.startRange:hover, 
+        .flatpickr-day.endRange:hover, 
+        .flatpickr-day.selected.prevMonthDay, 
+        .flatpickr-day.startRange.prevMonthDay, 
+        .flatpickr-day.endRange.prevMonthDay, 
+        .flatpickr-day.selected.nextMonthDay, 
+        .flatpickr-day.startRange.nextMonthDay, 
+        .flatpickr-day.endRange.nextMonthDay {
+            background: var(--primary-blue) !important;
+            border-color: var(--primary-blue) !important;
+        }
+
+        /* ปุ่มกด */
+        .btn-confirm {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 50px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 24px;
+            transition: background 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+        }
+
+        .btn-confirm:active {
+            background-color: var(--dark-blue);
+            transform: scale(0.98);
+        }
+
+        .btn-confirm:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Loader */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 9999;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-blue); border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Profile Section */
+        #user-profile {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            display: none; /* ซ่อนก่อนโหลดเสร็จ */
+        }
+        #user-profile img {
+            width: 40px; height: 40px; border-radius: 50%; margin-right: 10px;
+            border: 2px solid var(--primary-blue);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <p style="color: var(--primary-blue); margin-top: 10px;">กำลังเชื่อมต่อ LINE...</p>
+    </div>
+
+    <div class="container">
+        <div id="user-profile">
+            <img id="profile-img" src="" alt="Profile">
+            <span id="display-name" style="font-weight: bold;">User</span>
+        </div>
+
+        <h1>เลือกวันที่ว่างเที่ยว 🏖️</h1>
+        <p>จิ้มเลือกได้หลายวันเลย แล้วกดปุ่มยืนยัน</p>
+
+        <input type="text" id="calendar-input" placeholder="กดเพื่อเลือกวันที่..." style="display:none;">
+        <div id="calendar-container"></div>
+
+        <button id="submit-btn" class="btn-confirm" disabled>ยืนยันวันว่าง (0 วัน)</button>
+    </div>
+
+    <script>
+        // --- ⚙️ 3. ตั้งค่าระบบ ---
+        // 1. ใส่ LIFF ID ของคุณที่นี่
+        const MY_LIFF_ID = "2008649534-6mDQ8Amx"; 
+        // 2. ใส่ Webhook URL ของ n8n ที่นี่
+        const N8N_WEBHOOK_URL = "https://may12345.app.n8n.cloud/webhook/trip-planner"; 
+
+        let selectedDates = [];
+        let userProfile = null;
+
+        // เริ่มทำงานเมื่อเปิดหน้าเว็บ
+        async function main() {
+            try {
+                // เริ่มต้น LIFF
+                await liff.init({ liffId: MY_LIFF_ID });
+
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+
+                // ดึงข้อมูล User
+                const profile = await liff.getProfile();
+                userProfile = profile;
+                
+                // แสดงข้อมูล User บนหน้าจอ
+                document.getElementById('profile-img').src = profile.pictureUrl;
+                document.getElementById('display-name').innerText = `สวัสดี, ${profile.displayName}`;
+                document.getElementById('user-profile').style.display = 'flex';
+                
+                // ปิด Loader
+                document.getElementById('loader').style.display = 'none';
+
+                // ตั้งค่าปฏิทิน (Flatpickr)
+                initCalendar();
+
+            } catch (err) {
+                alert("เกิดข้อผิดพลาด: " + err.message);
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+
+        function initCalendar() {
+            flatpickr("#calendar-input", {
+                inline: true,              // แสดงปฏิทินค้างไว้เลย ไม่ต้องกด Input
+                mode: "multiple",          // เลือกได้หลายวัน
+                dateFormat: "Y-m-d",
+                minDate: "today",          // ห้ามเลือกวันในอดีต
+                appendTo: document.getElementById('calendar-container'),
+                onChange: function(selectedDatesObj, dateStr) {
+                    // เมื่อมีการเลือกวัน
+                    selectedDates = dateStr.split(', ').filter(d => d);
+                    updateButton();
+                }
+            });
+        }
+
+        function updateButton() {
+            const btn = document.getElementById('submit-btn');
+            const count = selectedDates.length;
+            
+            if (count > 0) {
+                btn.disabled = false;
+                btn.innerText = `ยืนยันวันว่าง (${count} วัน) ✅`;
+            } else {
+                btn.disabled = true;
+                btn.innerText = `ยืนยันวันว่าง (0 วัน)`;
+            }
+        }
+
+        // เมื่อกดปุ่มส่งข้อมูล
+        document.getElementById('submit-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('submit-btn');
+            btn.innerText = "กำลังส่งข้อมูล... ⏳";
+            btn.disabled = true;
+
+            try {
+                // ส่งข้อมูลไป n8n
+                const response = await fetch(N8N_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userProfile.userId,
+                        displayName: userProfile.displayName,
+                        dates: selectedDates
+                    })
+                });
+
+                if (response.ok) {
+                    // ส่งข้อความเข้าห้องแชทแทน User ว่าทำเสร็จแล้ว
+                    if (liff.isInClient()) {
+                        await liff.sendMessages([{
+                            type: 'text',
+                            text: `✅ ฉันเลือกวันว่างไป ${selectedDates.length} วันแล้วนะ!`
+                        }]);
+                        liff.closeWindow(); // ปิดหน้าต่าง
+                    }
+                } else {
+                    alert("ส่งข้อมูลไม่สำเร็จ โปรดลองใหม่");
+                    btn.disabled = false;
+                    updateButton();
+                }
+            } catch (error) {
+                alert("Error: " + error.message);
+                btn.disabled = false;
+                updateButton();
+            }
+        });
+
+        main();
+    </script>
+</body>
+</html>
