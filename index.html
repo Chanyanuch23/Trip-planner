@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เลือกวันว่างเที่ยวกันเถอะ</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; padding: 20px; text-align: center; }
+        .btn { background-color: #06C755; color: white; border: none; padding: 15px 30px; border-radius: 5px; font-size: 18px; cursor: pointer; margin-top: 20px; width: 100%; }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; } /* เพิ่มสไตล์ตอนปุ่มยังกดไม่ได้ */
+        h2 { color: #333; }
+        #status { font-size: 12px; color: #888; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>📅 เลือกวันที่คุณว่าง</h2>
+    <p>จิ้มเลือกวันที่ว่างได้หลายวันเลย!</p>
+    
+    <p id="status">กำลังเชื่อมต่อ LINE...</p>
+
+    <input type="text" id="calendar" placeholder="แตะเพื่อเลือกวัน..." style="display:none;">
+    
+    <button class="btn" id="submitBtn" disabled>กำลังโหลดข้อมูล...</button>
+
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <script>
+        // --- 1. ตั้งค่าตัวแปร ---
+        const MY_LIFF_ID = "2008649534-6mDQ8Amx"; 
+        const N8N_WEBHOOK_URL = "https://may12345.app.n8n.cloud/webhook/trip-planner"; 
+
+        let selectedDates = [];
+        let userProfile = null; // เริ่มต้นเป็น null
+        let context = null;
+
+        // --- 2. ตั้งค่าปฏิทิน ---
+        flatpickr("#calendar", {
+            mode: "multiple",
+            dateFormat: "Y-m-d",
+            inline: true,
+            onChange: function(selectedDatesStr, dateStr) {
+                selectedDates = dateStr.split(', ');
+            }
+        });
+
+        // --- 3. เริ่มต้น LIFF และดึงข้อมูล ---
+        async function main() {
+            try {
+                await liff.init({ liffId: MY_LIFF_ID });
+                
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+
+                // ดึงข้อมูล User
+                userProfile = await liff.getProfile();
+                context = liff.getContext();
+
+                // อัปเดตหน้าจอเมื่อข้อมูลพร้อม
+                document.getElementById('status').innerText = `สวัสดีคุณ ${userProfile.displayName}`;
+                const btn = document.getElementById('submitBtn');
+                btn.innerText = "ยืนยันวันว่าง";
+                btn.disabled = false; // ปลดล็อกปุ่ม
+
+            } catch (err) {
+                document.getElementById('status').innerText = "เกิดข้อผิดพลาดในการเชื่อมต่อ LINE";
+                alert("LIFF Error: " + err);
+            }
+        }
+        main();
+
+        // --- 4. เมื่อกดปุ่มส่งข้อมูล ---
+        document.getElementById('submitBtn').addEventListener('click', () => {
+            if (selectedDates.length === 0 || selectedDates[0] === "") {
+                alert("กรุณาเลือกวันอย่างน้อย 1 วันครับ");
+                return;
+            }
+
+            // เช็คความชัวร์ของ Group ID (ป้องกัน error ถ้าเปิดนอกกลุ่ม)
+            // ถ้า context มีค่า ให้เอา groupId ถ้าไม่มี หรือเปิดเดี่ยวๆ ให้ส่ง "Individual"
+            const groupId = (context && context.groupId) ? context.groupId : "Individual";
+
+            const dataToSend = {
+                userId: userProfile.userId,
+                displayName: userProfile.displayName,
+                groupId: groupId,
+                dates: selectedDates
+            };
+
+            // Debug: แสดงข้อมูลที่จะส่งให้ดูก่อน (ถ้าขึ้นครบ แสดงว่า Code หน้าบ้านผ่าน)
+            // alert("กำลังส่งข้อมูล: " + JSON.stringify(dataToSend)); 
+
+            fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataToSend)
+            })
+            .then(response => {
+                if(response.ok) {
+                    liff.closeWindow();
+                } else {
+                    alert("ส่งข้อมูลไม่สำเร็จ Status: " + response.status);
+                }
+            })
+            .catch(error => {
+                alert("ส่งไม่ได้! อาจเป็นที่ Internet หรือ n8n: " + error);
+            });
+        });
+    </script>
+</body>
+</html>
